@@ -1,0 +1,27 @@
+{
+  "version": "2025.10.08",
+  "cards": [
+    {
+      "id": "CARD_001",
+      "name": "Jason",
+      "type": "Character",
+      "dimension": "Hell",
+      "rarity": "Slasher",
+      "level": 3,
+      "score": 3000,
+      "image": "001.webp",
+      "last_updated": "2025-09-30T15:00:00Z"
+    },
+    {
+      "id": "CARD_002",
+      "name": "Abandoned Cabin",
+      "type": "Location",
+      "dimension": "Urban",
+      "rarity": "Common",
+      "level": 0,
+      "score": 0,
+      "image": "002.webp",
+      "last_updated": "2025-09-29T12:00:00Z"
+    }
+  ]
+}
