@@ -3,20 +3,23 @@ import enum
 class CardType(str, enum.Enum):
     survivant = "survivant"
     victime = "victime"
-    personnage = "personnage"
+    lvl1 = "lvl1"
+    lvl2 = "lvl2"
+    lvl3 = "lvl3"
     objet = "objet"
     evenement = "evenement"
     lieu = "lieu"
+    jeton = "jeton"
 
 class CardDimension(str, enum.Enum):
     desert = "desert"
-    espace = "espace"
-    enfer = "enfer"
     nature = "nature"
     urbain = "urbain"
+    enfer = "enfer"
+    espace = "espace"
 
-class CardRarity(int, enum.Enum):
-    commun = 1
-    rare = 2
-    super_rare = 3
-    mythique = 4
+class CardRarity(str, enum.Enum):
+    commune = "commune"
+    rare = "rare"
+    super_rare = "super_rare"
+    mythique = "mythique"

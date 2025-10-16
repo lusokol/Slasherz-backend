@@ -14,3 +14,10 @@ __pycache__/
 *.swp
 .idea/
 .vscode/
+
+# Other
+*.xlsx
+create_db.py
+import_cards_from_excel.py
+*.txt
+app/data/images/
