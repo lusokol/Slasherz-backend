@@ -1,0 +1,6 @@
+routes :
+
+/cards/all => GET toutes les cartes
+
+/datapack/version => GET la version actuelle via le json
+/datapack/sync => POST prend en param le datapack.json ou rien et renvoie le differenciel

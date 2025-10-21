@@ -1,10 +1,16 @@
 from fastapi import FastAPI, Depends
+from fastapi.staticfiles import StaticFiles
 from app.routes import cards, datapack
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.database import get_db
 
-app = FastAPI(title="Slasherz Backend")
+app = FastAPI(
+    title="Slasherz Backend",
+    version="0.1"
+)
+
+app.mount("/images", StaticFiles(directory="app/data/images"), name="images")
 
 app.include_router(cards.router)
 app.include_router(datapack.router)

@@ -21,3 +21,6 @@ create_db.py
 import_cards_from_excel.py
 *.txt
 app/data/images/
+change_card_name.py
+check_all_cards_name.py
+check_cards_then_import_into_db.py
