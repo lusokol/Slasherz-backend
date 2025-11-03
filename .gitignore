@@ -17,10 +17,15 @@ __pycache__/
 
 # Other
 *.xlsx
+*.txt
+*.err
+*.log
+app/data/images/
+
+# Files
 create_db.py
 import_cards_from_excel.py
-*.txt
-app/data/images/
 change_card_name.py
 check_all_cards_name.py
 check_cards_then_import_into_db.py
+rm_all_cards_from_db.py

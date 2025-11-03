@@ -1,10 +1,12 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse
+import hashlib
+import subprocess
 import json
 import os
 from datetime import datetime
 
-router = APIRouter(prefix="/datapack", tags=["Datapack"])
+router = APIRouter(prefix="/api/datapack", tags=["Datapack"])
 
 # === Chemins vers les fichiers serveurs ===
 DATA_PATH = "app/data"
@@ -27,24 +29,25 @@ def get_version():
 
 # === Route 2 : synchroniser le datapack ===
 @router.post("/sync")
-async def sync_datapack(file: UploadFile | None = File(None)):
+async def sync_datapack(client_data: dict | None = Body(None)):
     """
     Compare le datapack du client avec celui du serveur.
-    - Si aucun fichier n’est envoyé → renvoie le datapack complet.
+    - Si aucun JSON n’est envoyé → renvoie le datapack complet.
     - Sinon → renvoie les cartes à mettre à jour et à supprimer.
     """
 
-    # Vérifie l’existence du datapack serveur
+    # Vérifie que le datapack serveur existe
     if not os.path.exists(SERVER_DATAPACK):
         raise HTTPException(status_code=500, detail="datapack.json not found on server")
 
-    # Charge le datapack du serveur
+    # Charge le datapack serveur
     with open(SERVER_DATAPACK, "r", encoding="utf-8") as f:
         server_data = json.load(f)
-        server_cards = {card["id"]: card for card in server_data.get("cards", [])}
+        # print(f"{server_data["cards"]}")
+        server_cards = {card["image_name"]: card for card in server_data.get("cards", [])}
 
-    # Cas 1 : aucun fichier envoyé → on renvoie tout
-    if file is None:
+    # 🟦 Cas 1 : aucun JSON envoyé → renvoyer tout le datapack
+    if not client_data:
         return {
             "mode": "full",
             "version": server_data.get("version"),
@@ -53,13 +56,11 @@ async def sync_datapack(file: UploadFile | None = File(None)):
             "datapack": server_data
         }
 
-    # Cas 2 : fichier JSON client envoyé → comparaison différentielle
+    # 🟧 Cas 2 : JSON client envoyé → comparaison différentielle
     try:
-        content = await file.read()
-        client_data = json.loads(content.decode("utf-8"))
-        client_cards = {card["id"]: card for card in client_data.get("cards", [])}
+        client_cards = {card["image_name"]: card for card in client_data.get("cards", [])}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON file: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid client JSON: {e}")
 
     to_update = []
     to_delete = []
@@ -70,13 +71,13 @@ async def sync_datapack(file: UploadFile | None = File(None)):
         if not clt_card:
             to_update.append(card_id)
         else:
-            # Compare les dates de mise à jour
-            srv_date = srv_card.get("last_updated", "1970-01-01")
-            clt_date = clt_card.get("last_updated", "1970-01-01")
+            # Compare les dates
+            srv_date = srv_card.get("last_updated", "1970-01-01T00:00:00Z")
+            clt_date = clt_card.get("last_updated", "1970-01-01T00:00:00Z")
             if srv_date > clt_date:
                 to_update.append(card_id)
 
-    # Vérifie les cartes supprimées côté client
+    # Vérifie les cartes supprimées côté serveur
     for card_id in client_cards.keys():
         if card_id not in server_cards:
             to_delete.append(card_id)
@@ -86,7 +87,73 @@ async def sync_datapack(file: UploadFile | None = File(None)):
         "version": server_data.get("version"),
         "to_update": to_update,
         "to_delete": to_delete,
-        "datapack": server_data
+        "datapack": server_data,
     }
 
     return JSONResponse(content=response)
+
+# def compute_b2sum(file_path):
+#     import subprocess
+#     try:
+#         result = subprocess.run(["b2sum", file_path], capture_output=True, text=True)
+#         return result.stdout.split()[0]
+#     except Exception:
+#         # fallback in python if b2sum not available
+#         import hashlib
+#         BUF_SIZE = 65536
+#         blake = hashlib.blake2b()
+#         with open(file_path, "rb") as f:
+#             while chunk := f.read(BUF_SIZE):
+#                 blake.update(chunk)
+#         return blake.hexdigest()
+
+def compute_b2sum(file_path):
+    """
+    Calcule le hash BLAKE2b d'un fichier JSON normalisé :
+    - Trie les clés (équivalent jq -S .)
+    - Supprime l'indentation et les espaces inutiles
+    - Utilise b2sum si disponible, sinon hashlib.blake2b()
+    """
+    try:
+        # Lecture et normalisation du JSON
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        normalized_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+        # Essayer d'utiliser b2sum en subprocess
+        result = subprocess.run(
+            ["b2sum"],
+            input=normalized_json,
+            text=True,
+            capture_output=True
+        )
+
+        if result.returncode == 0 and result.stdout:
+            return result.stdout.split()[0]
+
+        # fallback Python si b2sum échoue
+        raise RuntimeError("b2sum failed")
+
+    except Exception:
+        # Fallback Python : calcul direct avec hashlib.blake2b
+        blake = hashlib.blake2b()
+        blake.update(normalized_json.encode("utf-8"))
+        return blake.hexdigest()
+
+
+@router.post("/hashcheck")
+async def hashcheck(data: dict):
+    """
+    Compare le hash du datapack local (envoyé par le client)
+    avec celui du serveur.
+    """
+    if not os.path.exists(SERVER_DATAPACK):
+        raise HTTPException(status_code=500, detail="datapack.json missing")
+
+    server_hash = compute_b2sum(SERVER_DATAPACK)
+    client_hash = data.get("hash")
+
+    return JSONResponse({
+        "server_hash": server_hash,
+        "is_same": (client_hash == server_hash)
+    })

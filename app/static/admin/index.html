@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Slasherz - Admin Cartes</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #111;
+        color: #eee;
+        margin: 0;
+        padding: 0;
+    }
+    header {
+        background-color: #b30000;
+        padding: 1rem;
+        text-align: center;
+        color: white;
+    }
+    main {
+        padding: 1rem 2rem;
+    }
+    h2 { margin-top: 2rem; }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #222;
+    }
+    table th, table td {
+        padding: 0.5rem;
+        border: 1px solid #333;
+        text-align: left;
+    }
+    table th {
+        background-color: #333;
+        cursor: pointer;
+    }
+    tr:hover {
+        background-color: #2a2a2a;
+    }
+    button {
+        background-color: #b30000;
+        color: white;
+        border: none;
+        padding: 0.4rem 0.7rem;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    button:hover {
+        background-color: #e00000;
+    }
+    input, select, textarea {
+        background-color: #1a1a1a;
+        color: white;
+        border: 1px solid #444;
+        padding: 0.4rem;
+        width: 100%;
+        border-radius: 4px;
+    }
+    form {
+        background-color: #181818;
+        padding: 1rem;
+        margin-top: 1rem;
+        border-radius: 8px;
+    }
+    .flex {
+        display: flex;
+        gap: 1rem;
+    }
+    .half { width: 50%; }
+    .image-preview {
+        width: 100px;
+        height: 140px;
+        object-fit: cover;
+        border: 1px solid #555;
+    }
+    #cardsContainer {
+        max-height: 500px;
+        overflow-y: auto;
+        margin-top: 1rem;
+        border: 1px solid #333;
+        border-radius: 6px;
+    }
+    .mode-label {
+        font-weight: bold;
+        color: #b30000;
+        margin-bottom: 0.5rem;
+        display: inline-block;
+    }
+</style>
+</head>
+
+<body>
+<header>
+    <h1>🩸 Slasherz - Administration des Cartes</h1>
+</header>
+
+<main>
+    <section>
+        <h2>📜 Liste des cartes</h2>
+        <input type="text" id="search" placeholder="Rechercher une carte..." />
+        <div id="cardsContainer">
+            <table id="cardsTable">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Type</th>
+                        <th>Dimension</th>
+                        <th>Rareté</th>
+                        <th>Score</th>
+                        <th>Image</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="cardsBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2>✏️ Ajouter / Modifier une carte</h2>
+        <div class="mode-label" id="formMode">🆕 Mode création</div>
+        <form id="cardForm">
+            <label>ID (non modifiable)</label>
+            <input type="text" id="cardId" readonly />
+            <button type="button" id="resetBtn" style="display:none; margin-top:0.5rem;">🔄 Passer en mode création</button>
+
+            <div class="flex">
+                <div class="half">
+                    <label>Nom</label>
+                    <input type="text" id="name" required />
+                    <label>Code</label>
+                    <input type="text" id="code" required />
+                    <label>Description</label>
+                    <textarea id="description"></textarea>
+                    <label>Type</label>
+                    <select id="type">
+                        <option value="survivant">Survivant</option>
+                        <option value="victime">Victime</option>
+                        <option value="lvl1">Level 1</option>
+                        <option value="lvl2">Level 2</option>
+                        <option value="lvl3">Level 3</option>
+                        <option value="objet">Objet</option>
+                        <option value="evenement">Événement</option>
+                        <option value="lieu">Lieu</option>
+                        <option value="jeton">Jeton</option>
+                    </select>
+                </div>
+                <div class="half">
+                    <label>Dimension</label>
+                    <select id="dimension">
+                        <option value="desert">Désert</option>
+                        <option value="nature">Nature</option>
+                        <option value="urbain">Urbain</option>
+                        <option value="enfer">Enfer</option>
+                        <option value="espace">Espace</option>
+                    </select>
+                    <label>Niveau (-1 = aucun)</label>
+                    <input type="number" id="level" value="-1" />
+                    <label>Score (-1 = aucun)</label>
+                    <input type="number" id="score" value="-1" />
+                    <label>Rareté</label>
+                    <select id="rarity">
+                        <option value="commune">Commune</option>
+                        <option value="rare">Rare</option>
+                        <option value="super_rare">Super Rare</option>
+                        <option value="mythique">Mythique</option>
+                    </select>
+                    <label>Image (.webp)</label>
+                    <input type="file" id="image" accept=".webp" />
+                    <img id="preview" class="image-preview" />
+                </div>
+            </div>
+            <button type="submit">💾 Enregistrer</button>
+        </form>
+    </section>
+</main>
+
+<script>
+const API_BASE = "https://slasherz.fr/api/cards";
+const tableBody = document.getElementById("cardsBody");
+const searchInput = document.getElementById("search");
+const form = document.getElementById("cardForm");
+const preview = document.getElementById("preview");
+const resetBtn = document.getElementById("resetBtn");
+const modeLabel = document.getElementById("formMode");
+const idInput = document.getElementById("cardId");
+
+let allCards = [];
+let editingId = null;
+
+// --- UUID generator ---
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0,
+        v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// === Charger les cartes ===
+async function loadCards() {
+    const res = await fetch(API_BASE + "/all");
+    allCards = await res.json();
+    renderCards();
+}
+
+// === Afficher les cartes ===
+function renderCards() {
+    const q = searchInput.value.toLowerCase();
+
+    // Ordre personnalisé des types
+    const typeOrder = {
+        "survivant": 1,
+        "victime": 2,
+        "lvl1": 3,
+        "lvl2": 4,
+        "lvl3": 5,
+        "objet": 6,
+        "evenement": 7,
+        "lieu": 8,
+        "jeton": 9
+    };
+
+    // Filtrer selon la recherche
+    const filtered = allCards.filter(c => c.name.toLowerCase().includes(q));
+
+    // Trier d’abord par type selon l’ordre défini, puis par nom alphabétique
+    filtered.sort((a, b) => {
+        const typeA = typeOrder[a.type] || 999;
+        const typeB = typeOrder[b.type] || 999;
+        if (typeA !== typeB) return typeA - typeB;
+        return a.name.localeCompare(b.name, "fr", { sensitivity: "base" });
+    });
+
+    // Afficher
+    tableBody.innerHTML = "";
+    filtered.forEach(c => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${c.name}</td>
+            <td>${c.type}</td>
+            <td>${c.dimension}</td>
+            <td>${c.rarity}</td>
+            <td>${c.score === null ? "-1" : c.score}</td>
+            <td><img src="/api/images/${c.image_name}.webp" width="60" /></td>
+            <td>
+                <button onclick="editCard('${c.id}')">✏️</button>
+                <button onclick="deleteCard('${c.id}')">🗑️</button>
+            </td>
+        `;
+        tableBody.appendChild(tr);
+    });
+}
+
+
+// === Prévisualisation image ===
+document.getElementById("image").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (file) preview.src = URL.createObjectURL(file);
+});
+
+// === Enregistrement ===
+form.addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    const currentId = editingId || generateUUID();
+    formData.append("id", currentId);
+    formData.append("name", document.getElementById("name").value);
+    formData.append("code", document.getElementById("code").value);
+    formData.append("description", document.getElementById("description").value);
+    formData.append("type", document.getElementById("type").value);
+    formData.append("dimension", document.getElementById("dimension").value);
+
+    const level = parseInt(document.getElementById("level").value);
+    const score = parseInt(document.getElementById("score").value);
+    formData.append("level_raw", level === -1 ? "" : level);
+    formData.append("score_raw", score === -1 ? "" : score);
+    formData.append("rarity", document.getElementById("rarity").value);
+
+    const file = document.getElementById("image").files[0];
+    if (file) formData.append("file", file);
+
+    const res = await fetch(API_BASE, { method: "POST", body: formData });
+    if (res.ok) {
+        alert("✅ Carte enregistrée !");
+        resetForm();
+        loadCards();
+    } else {
+        const err = await res.json()
+        alert("❌ Erreur : " + err.detail);
+    }
+});
+
+// === Mode édition ===
+function editCard(id) {
+    const c = allCards.find(x => x.id === id);
+    if (!c) return;
+    editingId = id;
+    idInput.value = id;
+    document.getElementById("name").value = c.name;
+    document.getElementById("code").value = c.code;
+    document.getElementById("description").value = c.description || "";
+    document.getElementById("type").value = c.type;
+    document.getElementById("dimension").value = c.dimension;
+    document.getElementById("level").value = c.level === null ? "-1" : c.level;
+    document.getElementById("score").value = c.score === null ? "-1" : c.score;
+    document.getElementById("rarity").value = c.rarity;
+    preview.src = `/api/images/${c.image_name}.webp`;
+
+    modeLabel.textContent = "✏️ Mode modification";
+    resetBtn.style.display = "inline-block";
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+
+// === Réinitialiser le formulaire ===
+function resetForm() {
+    editingId = null;
+    form.reset();
+    idInput.value = generateUUID();
+    preview.src = "";
+    document.getElementById("level").value = "-1";
+    document.getElementById("score").value = "-1";
+    modeLabel.textContent = "🆕 Mode création";
+    resetBtn.style.display = "none";
+}
+resetBtn.addEventListener("click", resetForm);
+
+// === Supprimer ===
+async function deleteCard(id) {
+    const c = allCards.find(x => x.id === id);
+    if (!confirm(`Supprimer la carte "${c.name}"" ?`)) return;
+    const res = await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+    if (res.ok) {
+        alert("🗑️ Carte supprimée !");
+        loadCards();
+    } else {
+        alert("❌ Erreur de suppression !");
+    }
+}
+
+searchInput.addEventListener("input", renderCards);
+loadCards();
+resetForm();
+</script>
+</body>
+</html>
